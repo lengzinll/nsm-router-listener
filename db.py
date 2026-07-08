@@ -4,7 +4,6 @@ DATABASE_URL = "postgresql://postgres:password123@localhost:5432/postgres"
 
 async def initdb():
     conn = await asyncpg.connect(DATABASE_URL)
-
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS router_logs (
             id BIGSERIAL PRIMARY KEY,

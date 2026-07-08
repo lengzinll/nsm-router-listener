@@ -24,32 +24,64 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+
+from typing import Optional
+from fastapi import Query, HTTPException
+
+ALLOWED_SORT_COLUMNS = {
+    "id",
+    "source_device_ip",
+    "source_ip",
+    "destination_ip",
+    "source_port",
+    "destination_port",
+    "protocol",
+    "action",
+    "router",
+    "connection_state",
+    "priority",
+    "created_at",
+}
+
+
 @app.get("/logs", tags=["Router logs"])
 async def get_logs(
-
+    # filters
     source_device_ip: Optional[str] = None,
     source_ip: Optional[str] = None,
     destination_ip: Optional[str] = None,
-
     source_port: Optional[int] = None,
     destination_port: Optional[int] = None,
-
     protocol: Optional[str] = None,
     action: Optional[str] = None,
-
     router: Optional[str] = None,
-
     connection_state: Optional[str] = None,
-
     priority: Optional[int] = None,
 
-    page: int = Query(1,ge=1),
-    page_size: int = Query(
-        100,
-        ge=1,
-        le=10000
-    )
+    # sort
+    sort_by: str = Query("id", description=f"One of: {', '.join(sorted(ALLOWED_SORT_COLUMNS))}"),
+    sort_order: str = Query("desc", pattern="^(?i)(asc|desc)$"),
+
+    # pagination
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=10000)
 ):
+
+    # Validate sort column against whitelist to prevent SQL injection
+    if sort_by not in ALLOWED_SORT_COLUMNS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sort_by column '{sort_by}'. Allowed: {', '.join(sorted(ALLOWED_SORT_COLUMNS))}"
+        )
+
+    order_direction = "ASC" if sort_order.lower() == "asc" else "DESC"
+
+    # Add id as a secondary tiebreaker for stable pagination when sort_by isn't unique
+    if sort_by == "id":
+        order_clause = f"ORDER BY id {order_direction}"
+    else:
+        order_clause = f"ORDER BY {sort_by} {order_direction}, id {order_direction}"
 
     filters = []
     values = []
@@ -62,56 +94,17 @@ async def get_logs(
             values.append(value)
             index += 1
 
-    add_filter(
-        "source_device_ip = ${}",
-        source_device_ip
-    )
-
-    add_filter(
-        "source_ip = ${}",
-        source_ip
-    )
-
-    add_filter(
-        "destination_ip = ${}",
-        destination_ip
-    )
-
-    add_filter(
-        "source_port = ${}",
-        source_port
-    )
-
-    add_filter(
-        "destination_port = ${}",
-        destination_port
-    )
-
-    add_filter(
-        "protocol = ${}",
-        protocol
-    )
-
-    add_filter(
-        "action = ${}",
-        action
-    )
-
-    add_filter(
-        "router = ${}",
-        router
-    )
-
-    add_filter(
-        "connection_state = ${}",
-        connection_state
-    )
-
-    add_filter(
-        "priority = ${}",
-        priority
-    )
-
+    add_filter("source_device_ip = ${}",source_device_ip)
+    add_filter("source_ip = ${}",source_ip)
+    add_filter("destination_ip = ${}",destination_ip)
+    add_filter("source_port = ${}",source_port)
+    add_filter("destination_port = ${}",destination_port)
+    add_filter("protocol = ${}",protocol)
+    add_filter("action = ${}",action)
+    add_filter("router = ${}",router)
+    add_filter("connection_state = ${}",connection_state)
+    add_filter("priority = ${}",priority)
+    
     where = ""
 
     if filters:
@@ -132,7 +125,7 @@ async def get_logs(
             SELECT *
             FROM router_logs
             {where}
-            ORDER BY id DESC
+            {order_clause}
             LIMIT ${index}
             OFFSET ${index+1}
             """,
@@ -141,11 +134,10 @@ async def get_logs(
             offset
         )
 
-
     return {
         "page": page,
         "page_size": page_size,
         "total": total,
         "total_pages": (total + page_size - 1) // page_size,
-        "data": [ dict(row) for row in rows ]
+        "data": [dict(row) for row in rows]
     }

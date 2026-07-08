@@ -27,69 +27,45 @@ def parse_mikrotik_log(raw, addr):
         log["action"] = action.group(1)
 
     # Interfaces
-    incoming = re.search(
-        r"in:<([^>]+)>",
-        message
-    )
+    incoming = re.search(r"in:<([^>]+)>",message)
 
     if incoming:
         log["incoming_interface"] = incoming.group(1)
 
-    outgoing = re.search(
-        r"out:([^,\s]+)",
-        message
-    )
+    outgoing = re.search(r"out:([^,\s]+)",message)
 
     if outgoing:
         log["outgoing_interface"] = outgoing.group(1)
 
     # Connection state
-    state = re.search(
-        r"connection-state:(\w+)",
-        message
-    )
+    state = re.search(r"connection-state:(\w+)",message)
 
     if state:
         log["connection_state"] = state.group(1)
 
     # Protocol
-    proto = re.search(
-        r"proto\s+(\w+)",
-        message
-    )
+    proto = re.search(r"proto\s+(\w+)",message)
 
     if proto:
         log["protocol"] = proto.group(1)
 
 
     # TCP flags
-    flag = re.search(
-        r"\((.*?)\)",
-        message
-    )
+    flag = re.search(r"\((.*?)\)",message)
 
     if flag:
         log["flags"] = flag.group(1)
 
     # Source -> Destination
-    connection = re.search(
-        r"(\d+\.\d+\.\d+\.\d+):(\d+)->(\d+\.\d+\.\d+\.\d+):(\d+)",
-        message
-    )
-
+    connection = re.search(r"(\d+\.\d+\.\d+\.\d+):(\d+)->(\d+\.\d+\.\d+\.\d+):(\d+)",message)
     if connection:
-
         log["source_ip"] = connection.group(1)
         log["source_port"] = int(connection.group(2))
         log["destination_ip"] = connection.group(3)
         log["destination_port"] = int(connection.group(4))
 
     # Packet length
-    length = re.search(
-        r"len\s+(\d+)",
-        message
-    )
-
+    length = re.search(r"len\s+(\d+)",message)
     if length:
         log["packet_length"] = int(length.group(1))
 
