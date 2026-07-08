@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from db import batch_insert_router_logs, initdb
+from db import batch_insert_router_logs, initdb, delete_old_router_logs
 from utils import parse_mikrotik_log
 
 HOST = "0.0.0.0"
@@ -10,6 +10,9 @@ MAX_QUEUE = 100000
 
 BATCH_SIZE = 5000
 BATCH_FLUSH_INTERVAL = 30.0  # seconds - flush partial batches so logs don't stall
+
+RETENTION_DAYS = 180          # keep only last 6 months
+CLEANUP_INTERVAL = 24 * 3600   # run cleanup every 1 day
 
 log_queue = asyncio.Queue(maxsize=MAX_QUEUE)
 
@@ -85,18 +88,30 @@ async def log_worker():
             await flush()
 
 
+async def cleanup_worker():
+    connection = await initdb()
+    print("Cleanup worker started")
+    while True:
+        try:
+            deleted = await delete_old_router_logs(connection, RETENTION_DAYS)
+            if deleted:
+                print(f"Cleanup: deleted {deleted} logs older than {RETENTION_DAYS} days")
+        except Exception as e:
+            print("Cleanup error:", e)
+        await asyncio.sleep(CLEANUP_INTERVAL)
+
+
 async def main():
     loop = asyncio.get_running_loop()
     receiver = UDPLogReceiver(log_queue)
-    transport, protocol = await loop.create_datagram_endpoint(
-        lambda: receiver, local_addr=(HOST, PORT)
-    )
+    transport, protocol = await loop.create_datagram_endpoint(lambda: receiver, local_addr=(HOST, PORT))
     print(f"Listening UDP logs on {PORT}")
 
     worker_task = asyncio.create_task(log_worker())
+    cleanup_task = asyncio.create_task(cleanup_worker())
 
     try:
-        await worker_task
+        await asyncio.gather(worker_task, cleanup_task)
     finally:
         transport.close()
 

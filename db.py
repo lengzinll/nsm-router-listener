@@ -104,3 +104,20 @@ async def batch_insert_router_logs(conn, logs):
             "packet_length",
         ]
     )
+
+
+async def delete_old_router_logs(connection, retention_days: int = 180):
+    """Delete router logs older than retention_days. Returns number of rows deleted."""
+    
+    result = await connection.execute(
+        """
+        DELETE FROM router_logs
+        WHERE timestamp < NOW() - ($1 || ' days')::interval
+        """,
+        str(retention_days),
+    )
+    # asyncpg returns a string like "DELETE 1234"
+    try:
+        return int(result.split()[-1])
+    except (ValueError, IndexError):
+        return None
