@@ -41,6 +41,7 @@ async def log_worker():
             return
         try:
             await batch_insert_router_logs(connection, batch)
+            print(f"Batch inserted: {len(batch)} logs")
         except Exception as e:
             print("Batch insert error:", e)
         finally:
