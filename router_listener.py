@@ -9,7 +9,7 @@ PORT = 13196
 MAX_QUEUE = 100000
 
 BATCH_SIZE = 5000
-BATCH_FLUSH_INTERVAL = 2.0  # seconds - flush partial batches so logs don't stall
+BATCH_FLUSH_INTERVAL = 30.0  # seconds - flush partial batches so logs don't stall
 
 log_queue = asyncio.Queue(maxsize=MAX_QUEUE)
 
