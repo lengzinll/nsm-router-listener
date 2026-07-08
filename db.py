@@ -3,6 +3,7 @@ import asyncpg
 DATABASE_URL = "postgresql://postgres:password123@localhost:5432/postgres"
 
 async def initdb():
+    
     conn = await asyncpg.connect(DATABASE_URL)
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS router_logs (
@@ -54,8 +55,6 @@ async def initdb():
         CREATE INDEX IF NOT EXISTS idx_router_logs_created_at
         ON router_logs(created_at);
     """)
-
-    print("Database and index initialized")
 
     return conn
 
@@ -112,7 +111,7 @@ async def delete_old_router_logs(connection, retention_days: int = 180):
     result = await connection.execute(
         """
         DELETE FROM router_logs
-        WHERE timestamp < NOW() - ($1 || ' days')::interval
+        WHERE created_at < NOW() - ($1 || ' days')::interval
         """,
         str(retention_days),
     )
